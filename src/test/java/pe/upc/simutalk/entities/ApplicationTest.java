@@ -14,6 +14,7 @@ import org.springframework.test.util.ReflectionTestUtils;
 import java.time.Instant;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static pe.upc.simutalk.enums.ApplicationStatus.*;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class ApplicationTest {
