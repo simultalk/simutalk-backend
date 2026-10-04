@@ -15,7 +15,6 @@ import pe.upc.simutalk.dtos.UpdateJobPostingResource;
 import pe.upc.simutalk.dtos.UpdateJobPostingStatusResource;
 import pe.upc.simutalk.entities.EvaluationCriterion;
 import pe.upc.simutalk.entities.JobPosting;
-import pe.upc.simutalk.entities.User;
 import pe.upc.simutalk.entities.Weight;
 import pe.upc.simutalk.enums.CriterionOrigin;
 import pe.upc.simutalk.enums.CriterionType;
