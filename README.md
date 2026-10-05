@@ -1,5 +1,5 @@
 # SimuTalk Backend
-[![CI](https://github.com/simutalk-upc/simutalk-backend/actions/workflows/ci.yml/badge.svg?branch=develop)](https://github.com/simutalk-upc/simutalk-backend/actions/workflows/ci.yml)
+[![CI](https://github.com/simultalk/simutalk-backend/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/simultalk/simutalk-backend/actions/workflows/ci.yml)
 API REST de **SimuTalk**, plataforma de preselección de talento: cada empresa define criterios de evaluación
 ponderados para su vacante, el sistema entrevista de forma asincrónica al postulante, puntúa cada respuesta con NLP
 y devuelve un ranking donde cada puntaje se rastrea hasta el fragmento textual que lo sustenta.
@@ -10,7 +10,9 @@ Curso 1ASI0705 Arquitectura de Aplicaciones Web — UPC — ciclo 202620.
 
 Java 21 · Spring Boot 4.1 · Spring Data JPA + Hibernate · PostgreSQL 16 · Spring Security + JWT · springdoc OpenAPI 3 · Maven
 
-La arquitectura (capas horizontales en once paquetes planos), las reglas del proyecto y las convenciones están en [CLAUDE.md](CLAUDE.md).
+La arquitectura se organiza en capas horizontales, en once paquetes: `config`, `controllers`, `dtos`, `entities`, `enums`,
+`exceptions`, `mappers`, `repositories`, `securities`, `serviceimpl` y `services`. Las reglas de negocio residen en las
+entidades, y los módulos funcionales se comunican entre sí mediante fachadas declaradas en `services`.
 
 ## Requisitos
 
@@ -491,5 +493,5 @@ con `details` por campo en los errores de validación (400). 401 = sin token o c
 
 ## Ramas
 
-`main` (estable) · `develop` (integración) · `feature/<area>-<descripcion>`. Commits con
-[Conventional Commits](https://www.conventionalcommits.org/). Detalle en [CLAUDE.md](CLAUDE.md).
+`main` (versiones liberadas) · `develop` (integración). Los commits se integran en `develop` y cada versión pasa a `main`
+mediante un Pull Request. Los mensajes siguen [Conventional Commits](https://www.conventionalcommits.org/).
