@@ -49,4 +49,30 @@ class AnswerTest {
         assertThat(answer.isFollowUp()).isTrue();
         assertThat(answer.getParentAnswerId()).isEqualTo(3L);
     }
+
+    @Test
+    void storesTheFollowUpQuestionOnce() {
+        var answer = new Answer(1L, "Usé un LEFT JOIN.", null, 60, Instant.now(), false, null);
+
+        answer.recordFollowUpQuestion("  ¿Podrías dar un ejemplo concreto?  ");
+
+        assertThat(answer.hasFollowUpQuestion()).isTrue();
+        assertThat(answer.getFollowUpQuestion()).isEqualTo("¿Podrías dar un ejemplo concreto?");
+        assertThatThrownBy(() -> answer.recordFollowUpQuestion("Otra")).isInstanceOf(IllegalStateException.class);
+    }
+
+    @Test
+    void followUpAnswerCannotStoreAFollowUpQuestion() {
+        var followUp = new Answer(1L, "Respuesta a la repregunta.", null, 40, Instant.now(), true, 10L);
+
+        assertThatThrownBy(() -> followUp.recordFollowUpQuestion("¿Algo más?")).isInstanceOf(IllegalStateException.class);
+    }
+
+    @Test
+    void newAnswerHasNoFollowUpQuestion() {
+        var answer = new Answer(1L, "Usé un LEFT JOIN.", null, 60, Instant.now(), false, null);
+
+        assertThat(answer.hasFollowUpQuestion()).isFalse();
+        assertThat(answer.getFollowUpQuestion()).isNull();
+    }
 }

@@ -241,4 +241,62 @@ class InterviewSessionTest {
                 .hasMessageContaining("valid until");
         assertThat(session.getStatus()).isEqualTo(InterviewSessionStatus.PENDING);
     }
+
+    /* ---------- US-09: follow-up question ---------- */
+
+    @Test
+    void regularAnswerToAQuestionThatAllowsItCanGetAFollowUpQuestion() {
+        startSession();
+        var parent = session.recordAnswer(answer(sqlQuestion, 60), sqlQuestion);
+
+        assertThat(session.answerForFollowUpQuestion(parent.getId(), sqlQuestion)).isSameAs(parent);
+    }
+
+    @Test
+    void followUpQuestionOnlyWhileInProgress() {
+        assertThatThrownBy(() -> session.answerForFollowUpQuestion(100L, sqlQuestion))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("IN_PROGRESS");
+    }
+
+    @Test
+    void followUpQuestionForAnAnswerOfAnotherSessionFails() {
+        startSession();
+
+        assertThatThrownBy(() -> session.answerForFollowUpQuestion(999L, null))
+                .isInstanceOf(BusinessRuleViolationException.class)
+                .hasMessageContaining("parent answer");
+    }
+
+    @Test
+    void followUpQuestionOnQuestionThatDoesNotAllowItFails() {
+        startSession();
+        var parent = session.recordAnswer(answer(cleaningQuestion, 60), cleaningQuestion);
+
+        assertThatThrownBy(() -> session.answerForFollowUpQuestion(parent.getId(), cleaningQuestion))
+                .isInstanceOf(BusinessRuleViolationException.class)
+                .hasMessageContaining("does not allow follow-up");
+    }
+
+    @Test
+    void followUpAnswerCannotGetAFollowUpQuestion() {
+        startSession();
+        var parent = session.recordAnswer(answer(sqlQuestion, 60), sqlQuestion);
+        var followUpAnswer = session.recordAnswer(followUp(sqlQuestion, parent.getId()), sqlQuestion);
+
+        assertThatThrownBy(() -> session.answerForFollowUpQuestion(followUpAnswer.getId(), sqlQuestion))
+                .isInstanceOf(BusinessRuleViolationException.class)
+                .hasMessageContaining("regular answer");
+    }
+
+    @Test
+    void noFollowUpQuestionOnceTheFollowUpWasAnswered() {
+        startSession();
+        var parent = session.recordAnswer(answer(sqlQuestion, 60), sqlQuestion);
+        session.recordAnswer(followUp(sqlQuestion, parent.getId()), sqlQuestion);
+
+        assertThatThrownBy(() -> session.answerForFollowUpQuestion(parent.getId(), sqlQuestion))
+                .isInstanceOf(BusinessRuleViolationException.class)
+                .hasMessageContaining("already has a follow-up");
+    }
 }

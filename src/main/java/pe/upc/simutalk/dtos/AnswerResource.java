@@ -10,5 +10,6 @@ public record AnswerResource(
         String audioUrl,
         int durationSeconds,
         Instant answeredAt,
-        boolean followUp) {
+        boolean followUp,
+        String followUpQuestion) {
 }
