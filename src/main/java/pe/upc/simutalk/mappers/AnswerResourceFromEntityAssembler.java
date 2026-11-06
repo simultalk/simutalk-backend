@@ -8,6 +8,6 @@ public class AnswerResourceFromEntityAssembler {
     public static AnswerResource toResourceFromEntity(Answer entity) {
         return new AnswerResource(entity.getId(), entity.getQuestionId(), entity.getParentAnswerId(),
                 entity.getTranscript(), entity.getAudioUrl(), entity.getDurationSeconds(), entity.getAnsweredAt(),
-                entity.isFollowUp());
+                entity.isFollowUp(), entity.getFollowUpQuestion());
     }
 }

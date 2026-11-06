@@ -44,6 +44,13 @@ public class Answer extends AuditableModel {
     @Column(name = "is_follow_up", nullable = false)
     private boolean followUp;
 
+    /**
+     * Follow-up question generated for this (regular) answer, if any (US-09). The candidate replies to it
+     * with a follow-up answer whose {@code parentAnswerId} is this answer.
+     */
+    @Column(name = "follow_up_question", columnDefinition = "TEXT")
+    private String followUpQuestion;
+
     public Answer(Long questionId, String transcript, String audioUrl, int durationSeconds, Instant answeredAt,
                   boolean followUp, Long parentAnswerId) {
         if (questionId == null || questionId <= 0) {
@@ -74,5 +81,23 @@ public class Answer extends AuditableModel {
         this.answeredAt = answeredAt;
         this.followUp = followUp;
         this.parentAnswerId = parentAnswerId;
+    }
+
+    /** Only a regular answer gets a follow-up question, and only once. */
+    public void recordFollowUpQuestion(String statement) {
+        if (followUp) {
+            throw new IllegalStateException("A follow-up answer cannot get a follow-up question");
+        }
+        if (followUpQuestion != null) {
+            throw new IllegalStateException("The answer already has a follow-up question");
+        }
+        if (statement == null || statement.isBlank()) {
+            throw new IllegalArgumentException("Follow-up question is required");
+        }
+        this.followUpQuestion = statement.strip();
+    }
+
+    public boolean hasFollowUpQuestion() {
+        return followUpQuestion != null;
     }
 }

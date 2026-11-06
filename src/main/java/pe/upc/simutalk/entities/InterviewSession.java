@@ -150,6 +150,43 @@ public class InterviewSession extends AuditableAggregateRoot<InterviewSession> {
     }
 
     /**
+     * The regular answer {@code answerId} that may get a follow-up question (US-09), checked with the same
+     * rules as recording a follow-up answer: only while IN_PROGRESS, the answer belongs to this session and is
+     * not itself a follow-up, its question allows follow-ups, and that question has no follow-up yet.
+     * {@code question} is the question of that answer; it may be {@code null} only when the answer is not
+     * in this session (that case is reported first).
+     *
+     * @throws InvalidStateTransitionException if the session is not IN_PROGRESS
+     * @throws BusinessRuleViolationException  if a rule above is broken
+     */
+    public Answer answerForFollowUpQuestion(Long answerId, Question question) {
+        if (status != InterviewSessionStatus.IN_PROGRESS) {
+            throw new InvalidStateTransitionException("Answers are only accepted while the session is IN_PROGRESS (current: %s)"
+                    .formatted(status));
+        }
+        var parent = answers.stream()
+                .filter(existing -> existing.getId() != null && existing.getId().equals(answerId))
+                .findFirst()
+                .orElseThrow(() -> new BusinessRuleViolationException(
+                        "The parent answer %s does not exist in this session".formatted(answerId)));
+        if (question == null) {
+            throw new IllegalArgumentException("The question of the answer is required");
+        }
+        if (parent.isFollowUp() || !parent.getQuestionId().equals(question.getId())) {
+            throw new BusinessRuleViolationException("A follow-up must reply to the regular answer of the same question");
+        }
+        if (!question.isAllowsFollowUp()) {
+            throw new BusinessRuleViolationException("Question %s does not allow follow-up questions".formatted(question.getId()));
+        }
+        var alreadyHasFollowUp = answers.stream()
+                .anyMatch(existing -> existing.isFollowUp() && existing.getQuestionId().equals(question.getId()));
+        if (alreadyHasFollowUp) {
+            throw new BusinessRuleViolationException("Question %s already has a follow-up".formatted(question.getId()));
+        }
+        return parent;
+    }
+
+    /**
      * @param expectedQuestionCount number of questions in the job posting's script
      * @throws InvalidStateTransitionException if the session is not IN_PROGRESS
      * @throws BusinessRuleViolationException  if some script question has no answer
