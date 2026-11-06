@@ -8,6 +8,10 @@ import org.springframework.web.client.RestClient;
 import java.math.BigDecimal;
 import java.net.InetSocketAddress;
 import java.time.Duration;
+import java.util.List;
+
+import pe.upc.simutalk.enums.CriterionKind;
+import pe.upc.simutalk.services.AnswerScoringService.CriterionFeedback;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -50,7 +54,7 @@ class AnswerScoringServiceImplTest {
     }
 
     @Test
-    void fallsBackWhenTheProviderDoesNotAnswerWithinTheTimeout() throws Exception {
+    void fallsBackToTheMockScorerWhenTheProviderDoesNotAnswerWithinTheTimeout() throws Exception {
         var server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
         server.createContext("/", exchange -> {
             try {
@@ -67,7 +71,8 @@ class AnswerScoringServiceImplTest {
 
             var result = live.score(TRANSCRIPT, "Pensamiento analítico", "Resuelve problemas con datos.");
 
-            assertThat(result.isAvailable()).isFalse();
+            assertThat(result.isAvailable()).isTrue();
+            assertThat(result).isEqualTo(MockAnswerScorer.score(TRANSCRIPT, "Pensamiento analítico", "Resuelve problemas con datos."));
             assertThat(Duration.ofNanos(System.nanoTime() - startedAt)).isLessThan(Duration.ofMillis(1_500));
         } finally {
             server.stop(0);
@@ -94,5 +99,69 @@ class AnswerScoringServiceImplTest {
         assertThat(result.confidence()).isEqualByComparingTo("1.00");
         assertThat(result.aiGeneratedSuspicion()).isTrue();
         assertThat(TRANSCRIPT.substring(result.startOffset(), result.endOffset())).isEqualTo(result.excerpt());
+    }
+
+    /* ---------- quality of the score ---------- */
+
+    private static final String CRITERION = "Pensamiento analítico";
+    private static final String CRITERION_DESCRIPTION = "Descompone problemas de negocio y los resuelve con datos.";
+
+    @Test
+    void mockScorerRanksGoodAboveWeakAboveEvasive() {
+        var good = MockAnswerScorer.score(TRANSCRIPT, CRITERION, CRITERION_DESCRIPTION);
+        var weak = MockAnswerScorer.score("Me gustan los datos y creo que soy analítico.", CRITERION, CRITERION_DESCRIPTION);
+        var evasive = MockAnswerScorer.score("No sé, la verdad no sé cómo responder.", CRITERION, CRITERION_DESCRIPTION);
+
+        assertThat(evasive.score()).isLessThanOrEqualTo(new BigDecimal("2.0"));
+        assertThat(weak.score()).isGreaterThan(evasive.score());
+        assertThat(good.score()).isGreaterThan(weak.score());
+        assertThat(evasive.isAvailable()).isTrue();
+        assertThat(evasive.rationale()).contains("evasiva");
+    }
+
+    @Test
+    void mockScorerGivesALowScoreToAnEmptyAnswer() {
+        var empty = MockAnswerScorer.score("Bueno, eso.", CRITERION, CRITERION_DESCRIPTION);
+
+        assertThat(empty.score()).isLessThanOrEqualTo(new BigDecimal("2.0"));
+    }
+
+    @Test
+    void aLongRelevantAnswerIsNotTakenAsEvasive() {
+        var answer = "No se puede analizar sin datos limpios, así que primero descompondría el problema de negocio "
+                + "por región y canal, revisaría los datos de ventas y validaría la hipótesis con el equipo comercial.";
+
+        var result = MockAnswerScorer.score(answer, CRITERION, CRITERION_DESCRIPTION);
+
+        assertThat(result.score()).isGreaterThan(new BigDecimal("5.0"));
+        assertThat(result.rationale()).isNull();
+    }
+
+    @Test
+    void readsTheRationaleAndCapsItsLength() {
+        var live = service("live", "k");
+        var response = "{\"score\":1.0,\"confidence\":0.9,\"excerpt\":\"Primero confirmaría que la caída es real.\","
+                + "\"rationale\":\"" + "x".repeat(400) + "\"}";
+
+        var result = live.parse(response, TRANSCRIPT);
+
+        assertThat(result.isAvailable()).isTrue();
+        assertThat(result.rationale()).hasSize(AnswerScoringServiceImpl.RATIONALE_MAX_LENGTH);
+    }
+
+    @Test
+    void theScoringPromptPenalizesEvasiveAnswersAndAsksForAStrictJson() {
+        var prompt = GeminiRequestFactory.prompt("No sé, la verdad no sé cómo responder.", CRITERION, CRITERION_DESCRIPTION);
+
+        assertThat(prompt).contains("0 a 2", "evasiva", "\"score\"", "\"excerpt\"", "\"rationale\"", "LITERALMENTE",
+                "No sé, la verdad no sé cómo responder.");
+    }
+
+    @Test
+    void theFeedbackPromptExplainsWhyWithTheRationale() {
+        var prompt = GeminiRequestFactory.feedbackPrompt("1.0", List.of(new CriterionFeedback(CRITERION,
+                CriterionKind.COMPETENCY, new BigDecimal("1.0"), 100, "No sé", "Respuesta evasiva: no aporta evidencia.")));
+
+        assertThat(prompt).contains("motivo del puntaje: Respuesta evasiva: no aporta evidencia.", "evasiva");
     }
 }

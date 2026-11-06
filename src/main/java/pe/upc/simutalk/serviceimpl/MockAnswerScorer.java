@@ -21,6 +21,15 @@ final class MockAnswerScorer {
     private static final Pattern SENTENCE = Pattern.compile("[^.!?]+[.!?]?");
     private static final int STEM_LENGTH = 5;
     private static final Set<String> AI_TELLS = Set.of("como modelo de lenguaje", "como asistente de ia", "como ia,");
+    /** Evasive answers, matched on the lower-cased text without accents. */
+    private static final Pattern EVASIVE = Pattern.compile("\\b(no se|no lo se|ni idea|no tengo idea|no sabria|no recuerdo"
+            + "|no estoy seguro|no entiendo la pregunta|i don.?t know|no idea|not sure)\\b");
+    /** Up to this many words, an evasive answer with almost no reference to the criterion scores low. */
+    static final int EVASIVE_MAX_WORDS = 25;
+    /** Fewer words than this, with no reference to the criterion, is an empty answer. */
+    static final int EMPTY_MAX_WORDS = 6;
+    static final double EVASIVE_SCORE = 1.0;
+    static final double EMPTY_SCORE = 1.5;
 
     private MockAnswerScorer() {
     }
@@ -44,13 +53,18 @@ final class MockAnswerScorer {
         var excerpt = raw.strip();
         var start = best.start() + leading;
         var totalHits = hits(transcript, stems);
-        var words = transcript.split("\\s+").length;
-        var score = Math.min(10.0, 4.0 + Math.min(4.0, totalHits * 0.8) + Math.min(2.0, words / 40.0));
-        var confidence = Math.min(0.95, 0.55 + Math.min(0.4, hits(excerpt, stems) * 0.1));
+        var words = transcript.strip().split("\\s+").length;
+        var evasive = words <= EVASIVE_MAX_WORDS && totalHits <= 1 && EVASIVE.matcher(fold(transcript)).find();
+        var empty = words < EMPTY_MAX_WORDS && totalHits == 0;
+        var score = evasive ? EVASIVE_SCORE : empty ? EMPTY_SCORE
+                : Math.min(10.0, 4.0 + Math.min(4.0, totalHits * 0.8) + Math.min(2.0, words / 40.0));
+        var confidence = evasive || empty ? 0.8 : Math.min(0.95, 0.55 + Math.min(0.4, hits(excerpt, stems) * 0.1));
+        var rationale = evasive ? "Respuesta evasiva: no aporta evidencia sobre el criterio."
+                : empty ? "Respuesta demasiado breve y sin relación con el criterio." : null;
         var aiSuspicion = AI_TELLS.stream().anyMatch(transcript.toLowerCase(Locale.ROOT)::contains);
         return new ScoringResult(BigDecimal.valueOf(score).setScale(1, RoundingMode.HALF_UP),
                 BigDecimal.valueOf(confidence).setScale(2, RoundingMode.HALF_UP),
-                excerpt, start, start + excerpt.length(), aiSuspicion);
+                excerpt, start, start + excerpt.length(), aiSuspicion, rationale);
     }
 
     private static Set<String> stems(String text) {
