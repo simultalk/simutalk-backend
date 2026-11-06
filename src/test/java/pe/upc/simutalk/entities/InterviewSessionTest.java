@@ -18,7 +18,7 @@ import static pe.upc.simutalk.enums.InterviewSessionStatus.*;
 class InterviewSessionTest {
 
     private static final long JOB_POSTING_ID = 1L;
-    private static final LocalDate TODAY = LocalDate.of(2026, 9, 28);
+    private static final LocalDate TODAY = LocalDate.now(java.time.ZoneOffset.UTC);
 
     private InterviewSession session;
     private Question sqlQuestion;
