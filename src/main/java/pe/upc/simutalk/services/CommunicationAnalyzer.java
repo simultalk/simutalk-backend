@@ -50,7 +50,8 @@ public final class CommunicationAnalyzer {
         FILLERS.put("i mean", Pattern.compile("\\bi mean\\b"));
     }
 
-    private static final Pattern CONCRETE_EXAMPLE = Pattern.compile("\\b(?:por ejemplo|una vez|en el proyecto"
+    /** "una vez" introduces an example ("Una vez tuve que…") except in "de una vez" / "más de una vez". */
+    private static final Pattern CONCRETE_EXAMPLE = Pattern.compile("\\b(?:por ejemplo|(?<!de )una vez|en el proyecto"
             + "|en mi (?:anterior|ultimo|ultima|trabajo|empresa|equipo|practica|practicas|proyecto)"
             + "|cuando (?:trabaje|estaba|estuve|lidere|tuve|hice)"
             + "|for example|for instance|in my (?:last|previous|current) (?:job|role|team|project|company)|once i)\\b");

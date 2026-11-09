@@ -165,10 +165,26 @@ class JobPostingTest {
         addCompetency("Comunicación", 100);
         jobPosting.publish(ALL_COVERED);
 
-        assertThatThrownBy(jobPosting::ensureCanBeDeleted).isInstanceOf(BusinessRuleViolationException.class);
+        assertThatThrownBy(() -> jobPosting.ensureCanBeDeleted(false)).isInstanceOf(BusinessRuleViolationException.class);
 
         jobPosting.close();
-        jobPosting.ensureCanBeDeleted();
+        jobPosting.ensureCanBeDeleted(false);
+    }
+
+    @Test
+    void jobPostingWithApplicationsCannotBeDeletedEvenWhenClosed() {
+        addCompetency("Comunicación", 100);
+        jobPosting.publish(ALL_COVERED);
+        jobPosting.close();
+
+        assertThatThrownBy(() -> jobPosting.ensureCanBeDeleted(true))
+                .isInstanceOf(BusinessRuleViolationException.class)
+                .hasMessageContaining("with applications");
+    }
+
+    @Test
+    void draftWithoutApplicationsCanBeDeleted() {
+        jobPosting.ensureCanBeDeleted(false);
     }
 
     @Test

@@ -83,4 +83,15 @@ class CommunicationAnalyzerTest {
         assertThat(analysis.wordsPerMinute()).isNull();
         assertThat(analysis.fillerWords()).isEmpty();
     }
+
+    @Test
+    void repeatedThingsAreNotTakenAsAnExample() {
+        var analysis = CommunicationAnalyzer.analyze(1L, List.of(
+                answer(10L, "Contaría cuántos clientes aparecen más de una vez con el mismo documento.", 30),
+                answer(11L, "Una vez tuve que limpiar una base con duplicados.", 30)));
+
+        assertThat(analysis.answers().get(0).concreteExampleEvidence()).isNull();
+        assertThat(analysis.answers().get(1).concreteExampleEvidence())
+                .isEqualTo("Una vez tuve que limpiar una base con duplicados.");
+    }
 }
