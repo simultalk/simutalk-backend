@@ -226,6 +226,7 @@ class InterviewsAuthorizationTest {
         assertThat(sessions.startSession(900L).getStatusCode()).isEqualTo(HttpStatus.OK);
         assertThat(sessions.recordAnswer(900L, answerBody()).getStatusCode()).isEqualTo(HttpStatus.CREATED);
         assertThat(sessions.getAnswers(900L).getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(sessions.getCommunicationAnalysis(900L).getStatusCode()).isEqualTo(HttpStatus.OK);
         var followUp = sessions.generateFollowUpQuestion(900L, 300L);
         assertThat(followUp.getStatusCode()).isEqualTo(HttpStatus.CREATED);
         assertThat(followUp.getBody().parentAnswerId()).isEqualTo(300L);
@@ -242,6 +243,7 @@ class InterviewsAuthorizationTest {
         assertThatThrownBy(() -> sessions.completeSession(900L)).isInstanceOf(AccessDeniedException.class);
         assertThatThrownBy(() -> sessions.getAnswers(900L)).isInstanceOf(AccessDeniedException.class);
         assertThatThrownBy(() -> sessions.generateFollowUpQuestion(900L, 300L)).isInstanceOf(AccessDeniedException.class);
+        assertThatThrownBy(() -> sessions.getCommunicationAnalysis(900L)).isInstanceOf(AccessDeniedException.class);
         verifyNoInteractions(sessionCommands);
     }
 

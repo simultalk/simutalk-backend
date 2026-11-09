@@ -2,6 +2,7 @@ package pe.upc.simutalk.controllers;
 
 import pe.upc.simutalk.dtos.AnswerResource;
 import pe.upc.simutalk.dtos.CompleteInterviewSessionCommand;
+import pe.upc.simutalk.dtos.CommunicationAnalysis;
 import pe.upc.simutalk.dtos.CreateInterviewSessionResource;
 import pe.upc.simutalk.dtos.FollowUpQuestionResource;
 import pe.upc.simutalk.dtos.GenerateFollowUpQuestionCommand;
@@ -16,6 +17,7 @@ import pe.upc.simutalk.mappers.CreateInterviewSessionCommandFromResourceAssemble
 import pe.upc.simutalk.mappers.FollowUpQuestionResourceFromDtoAssembler;
 import pe.upc.simutalk.mappers.InterviewSessionResourceFromEntityAssembler;
 import pe.upc.simutalk.mappers.RecordAnswerCommandFromResourceAssembler;
+import pe.upc.simutalk.services.CommunicationAnalyzer;
 import pe.upc.simutalk.services.InterviewSessionCommandService;
 import pe.upc.simutalk.services.InterviewSessionQueryService;
 
@@ -135,5 +137,17 @@ public class InterviewSessionController {
     public ResponseEntity<List<AnswerResource>> getAnswers(@PathVariable Long sessionId) {
         var answers = interviewSessionQueryService.handle(new GetAnswersByInterviewSessionIdQuery(sessionId));
         return ResponseEntity.ok(answers.stream().map(AnswerResourceFromEntityAssembler::toResourceFromEntity).toList());
+    }
+
+    @GetMapping("/interview-sessions/{sessionId}/communication-analysis")
+    @PreAuthorize("hasRole('ADMIN') or @interviewsAccess.isSessionCandidate(#sessionId, authentication) "
+            + "or @interviewsAccess.ownsSessionJobPosting(#sessionId, authentication)")
+    @Operation(summary = "Análisis de comunicación de la entrevista",
+            description = "El candidato dueño o el recruiter de la vacante. Reglas fijas, sin IA: palabras, palabras por "
+                    + "minuto de respuesta, muletillas, longitud de cada respuesta y la frase literal que muestra un "
+                    + "ejemplo concreto o un resultado. No cambia el puntaje.")
+    public ResponseEntity<CommunicationAnalysis> getCommunicationAnalysis(@PathVariable Long sessionId) {
+        var answers = interviewSessionQueryService.handle(new GetAnswersByInterviewSessionIdQuery(sessionId));
+        return ResponseEntity.ok(CommunicationAnalyzer.analyze(sessionId, answers));
     }
 }
