@@ -72,13 +72,15 @@ public final class GeminiRequestFactory {
                 Explica qué sostuvo su puntaje y en qué criterio perdió más puntos (usa el motivo del puntaje cuando lo
                 haya; si una respuesta fue evasiva o sin contenido, dilo con respeto) y cómo podría mejorar.
                 No menciones posiciones, rankings, otros postulantes ni sospechas de ningún tipo.
+                No saludes por nombre ni escribas marcadores como [NOMBRE]: no conoces a la persona. Empieza directamente
+                por la retroalimentación (por ejemplo, "Gracias por completar la entrevista.").
 
                 PUNTAJE PONDERADO: %s de 10
                 CRITERIOS:
                 %s
 
-                Devuelve solo un objeto JSON con la clave "feedback": un texto en español de máximo 800 caracteres,
-                dirigido al postulante en segunda persona.
+                Devuelve solo un objeto JSON con la clave "feedback": un texto de máximo 800 caracteres, en el idioma
+                indicado, dirigido al postulante en segunda persona.
                 """.formatted(weightedScore, lines);
     }
 }

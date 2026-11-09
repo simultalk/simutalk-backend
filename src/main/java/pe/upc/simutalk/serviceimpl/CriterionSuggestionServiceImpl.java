@@ -45,7 +45,7 @@ public class CriterionSuggestionServiceImpl implements CriterionSuggestionServic
         if (!aiClient.isLive()) {
             return MockCriterionSuggester.suggest(title, description, existing);
         }
-        var parsed = aiClient.generate(prompt(title, description, existing) + "\n" + AiLanguage.currentPromptInstruction())
+        var parsed = aiClient.generate(AiLanguage.inCurrentLanguage(prompt(title, description, existing)))
                 .map(text -> parse(text, existing))
                 .orElse(List.of());
         if (parsed.isEmpty()) {

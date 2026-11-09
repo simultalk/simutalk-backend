@@ -46,8 +46,8 @@ public class QuestionSuggestionServiceImpl implements QuestionSuggestionService 
         if (!aiClient.isLive()) {
             return MockQuestionSuggester.suggest(criterionName, criterionDescription, existing);
         }
-        var parsed = aiClient.generate(prompt(jobTitle, jobDescription, criterionName, criterionDescription, existing)
-                + "\n" + AiLanguage.currentPromptInstruction())
+        var parsed = aiClient.generate(AiLanguage.inCurrentLanguage(
+                        prompt(jobTitle, jobDescription, criterionName, criterionDescription, existing)))
                 .map(text -> parse(text, existing))
                 .orElse(List.of());
         if (parsed.isEmpty()) {

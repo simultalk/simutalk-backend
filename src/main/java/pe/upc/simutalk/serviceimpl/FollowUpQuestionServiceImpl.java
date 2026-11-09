@@ -37,8 +37,8 @@ public class FollowUpQuestionServiceImpl implements FollowUpQuestionService {
         if (!aiClient.isLive()) {
             return MockFollowUpQuestionWriter.write(criterionName, anonymizedAnswer);
         }
-        var statement = aiClient.generate(prompt(questionStatement, criterionName, criterionDescription, anonymizedAnswer)
-                        + "\n" + AiLanguage.currentPromptInstruction())
+        var statement = aiClient.generate(AiLanguage.inCurrentLanguage(
+                        prompt(questionStatement, criterionName, criterionDescription, anonymizedAnswer)))
                 .flatMap(this::parse);
         if (statement.isEmpty()) {
             log.warn("AI follow-up question unavailable; answering with the template-based follow-up question");

@@ -66,7 +66,8 @@ public class AnswerScoringServiceImpl implements AnswerScoringService {
         if (!aiClient.isLive()) {
             return MockAnswerScorer.score(anonymizedTranscript, criterionName, criterionDescription);
         }
-        var result = aiClient.generate(GeminiRequestFactory.prompt(anonymizedTranscript, criterionName, criterionDescription))
+        var result = aiClient.generate(AiLanguage.inCurrentLanguage(
+                        GeminiRequestFactory.prompt(anonymizedTranscript, criterionName, criterionDescription)))
                 .map(text -> parse(text, anonymizedTranscript))
                 .orElseGet(ScoringResult::unavailable);
         if (!result.isAvailable()) {
@@ -82,7 +83,8 @@ public class AnswerScoringServiceImpl implements AnswerScoringService {
         if (!aiClient.isLive() || criteria == null || criteria.isEmpty()) {
             return fallback;
         }
-        return aiClient.generate(GeminiRequestFactory.feedbackPrompt(weightedScore.toPlainString(), criteria))
+        return aiClient.generate(AiLanguage.inCurrentLanguage(
+                        GeminiRequestFactory.feedbackPrompt(weightedScore.toPlainString(), criteria)))
                 .flatMap(this::readFeedback)
                 .orElse(fallback);
     }
@@ -90,13 +92,23 @@ public class AnswerScoringServiceImpl implements AnswerScoringService {
     /** The model's {@code feedback}, if present and within the aggregate's limit. */
     private Optional<String> readFeedback(String text) {
         try {
-            var feedback = objectMapper.readTree(text).path("feedback").asString("").strip();
+            var feedback = withoutMarkers(objectMapper.readTree(text).path("feedback").asString(""));
             return feedback.isEmpty() || feedback.length() > Assessment.FEEDBACK_MAX_LENGTH
                     ? Optional.empty() : Optional.of(feedback);
         } catch (Exception ex) {
             log.warn("Could not read the AI feedback: {}", ex.toString());
             return Optional.empty();
         }
+    }
+
+    /**
+     * The feedback without anonymization markers: they are placeholders for the AI, never text for the candidate
+     * (a model may still write "Estimado/a [NOMBRE]" despite the instruction).
+     */
+    static String withoutMarkers(String feedback) {
+        return feedback.replaceAll("\\s*\\[(NOMBRE|DOCUMENTO|EMAIL|TELEFONO|DIRECCION|FECHA|EDAD|URL)\\]", "")
+                .replaceAll("\\s+([,.;:!?])", "$1")
+                .strip();
     }
 
     /** Reads the model's JSON answer; anything malformed or not literally anchored becomes unavailable. */

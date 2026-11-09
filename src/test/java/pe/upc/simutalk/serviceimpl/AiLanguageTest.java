@@ -54,4 +54,15 @@ class AiLanguageTest {
         RequestContextHolder.resetRequestAttributes();
         assertThat(AiLanguage.current()).isEqualTo(AiLanguage.SPANISH);
     }
+
+    @Test
+    void framesThePromptWithTheInstructionOfTheCurrentRequest() {
+        requestWithHeader("en-US");
+
+        var prompt = AiLanguage.inCurrentLanguage("PROMPT");
+
+        assertThat(prompt).startsWith(AiLanguage.promptInstruction(AiLanguage.ENGLISH))
+                .endsWith(AiLanguage.promptInstruction(AiLanguage.ENGLISH)).contains("\n\nPROMPT\n");
+        assertThat(AiLanguage.promptInstruction(AiLanguage.ENGLISH)).contains("English (en-US)", "excerpt");
+    }
 }
