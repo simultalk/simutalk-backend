@@ -34,6 +34,7 @@ import java.util.Optional;
 public class AnswerScoringServiceImpl implements AnswerScoringService {
 
     static final String MOCK_ENGINE_VERSION = "mock-1";
+    static final int RATIONALE_MAX_LENGTH = 300;
 
     private final GenerativeAiClient aiClient;
     private final ObjectMapper objectMapper;
@@ -65,9 +66,14 @@ public class AnswerScoringServiceImpl implements AnswerScoringService {
         if (!aiClient.isLive()) {
             return MockAnswerScorer.score(anonymizedTranscript, criterionName, criterionDescription);
         }
-        return aiClient.generate(GeminiRequestFactory.prompt(anonymizedTranscript, criterionName, criterionDescription))
+        var result = aiClient.generate(GeminiRequestFactory.prompt(anonymizedTranscript, criterionName, criterionDescription))
                 .map(text -> parse(text, anonymizedTranscript))
                 .orElseGet(ScoringResult::unavailable);
+        if (!result.isAvailable()) {
+            log.warn("AI score unavailable for criterion '{}'; using the deterministic mock scorer for this answer", criterionName);
+            return MockAnswerScorer.score(anonymizedTranscript, criterionName, criterionDescription);
+        }
+        return result;
     }
 
     @Override
@@ -111,9 +117,14 @@ public class AnswerScoringServiceImpl implements AnswerScoringService {
             if (score < 0 || confidence < 0) {
                 return ScoringResult.unavailable();
             }
+            var rationale = json.path("rationale").asString("").strip();
+            if (rationale.length() > RATIONALE_MAX_LENGTH) {
+                rationale = rationale.substring(0, RATIONALE_MAX_LENGTH);
+            }
             return new ScoringResult(BigDecimal.valueOf(score).setScale(1, RoundingMode.HALF_UP),
                     BigDecimal.valueOf(confidence).setScale(2, RoundingMode.HALF_UP),
-                    excerpt, start, start + excerpt.length(), json.path("aiGeneratedSuspicion").asBoolean(false));
+                    excerpt, start, start + excerpt.length(), json.path("aiGeneratedSuspicion").asBoolean(false),
+                    rationale.isEmpty() ? null : rationale);
         } catch (Exception ex) {
             log.warn("Could not read the AI answer: {}", ex.toString());
             return ScoringResult.unavailable();

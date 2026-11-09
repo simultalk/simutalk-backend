@@ -30,9 +30,16 @@ public interface AnswerScoringService {
 
     /**
      * @param anonymizedExcerpt a supporting fragment of the ANONYMIZED answer, or {@code null} (certifications)
+     * @param rationale         why the criterion got its score, written by the scorer; may be {@code null}
      */
     record CriterionFeedback(String criterionName, CriterionKind criterionKind, BigDecimal score, int weightApplied,
-                             String anonymizedExcerpt) {
+                             String anonymizedExcerpt, String rationale) {
+
+        /** Without a rationale. */
+        public CriterionFeedback(String criterionName, CriterionKind criterionKind, BigDecimal score, int weightApplied,
+                                 String anonymizedExcerpt) {
+            this(criterionName, criterionKind, score, weightApplied, anonymizedExcerpt, null);
+        }
     }
 
     /**
@@ -42,9 +49,16 @@ public interface AnswerScoringService {
      * @param startOffset          start of {@code excerpt} in the anonymized transcript (inclusive)
      * @param endOffset            end of {@code excerpt} in the anonymized transcript (exclusive)
      * @param aiGeneratedSuspicion whether the answer looks AI-generated
+     * @param rationale            brief justification of the score (it never names the candidate); may be {@code null}
      */
     record ScoringResult(BigDecimal score, BigDecimal confidence, String excerpt, int startOffset, int endOffset,
-                         boolean aiGeneratedSuspicion) {
+                         boolean aiGeneratedSuspicion, String rationale) {
+
+        /** Without a rationale. */
+        public ScoringResult(BigDecimal score, BigDecimal confidence, String excerpt, int startOffset, int endOffset,
+                             boolean aiGeneratedSuspicion) {
+            this(score, confidence, excerpt, startOffset, endOffset, aiGeneratedSuspicion, null);
+        }
 
         /** Fallback when the provider could not be consulted or answered something unusable. */
         public static ScoringResult unavailable() {

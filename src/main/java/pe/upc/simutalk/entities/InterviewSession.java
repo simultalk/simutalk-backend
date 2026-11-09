@@ -141,12 +141,30 @@ public class InterviewSession extends AuditableAggregateRoot<InterviewSession> {
             throw new BusinessRuleViolationException("The question does not belong to this interview's script");
         }
         if (answer.isFollowUp()) {
-            ensureFollowUpIsAllowed(answer, question);
+            ensureFollowUpIsAllowed(answer.getParentAnswerId(), answer.getQuestionId(), question);
         } else if (hasRegularAnswerFor(answer.getQuestionId())) {
             throw new BusinessRuleViolationException("Question %s has already been answered".formatted(answer.getQuestionId()));
         }
         answers.add(answer);
         return answer;
+    }
+
+    /**
+     * The regular answer {@code answerId} that may get a follow-up question (US-09), checked with the same
+     * rules as recording a follow-up answer: only while IN_PROGRESS, the answer belongs to this session and is
+     * not itself a follow-up, its question allows follow-ups, and that question has no follow-up yet.
+     * {@code question} is the question of that answer; it may be {@code null} only when the answer is not
+     * in this session (that case is reported first).
+     *
+     * @throws InvalidStateTransitionException if the session is not IN_PROGRESS
+     * @throws BusinessRuleViolationException  if a rule above is broken
+     */
+    public Answer answerForFollowUpQuestion(Long answerId, Question question) {
+        if (status != InterviewSessionStatus.IN_PROGRESS) {
+            throw new InvalidStateTransitionException("Answers are only accepted while the session is IN_PROGRESS (current: %s)"
+                    .formatted(status));
+        }
+        return ensureFollowUpIsAllowed(answerId, question == null ? null : question.getId(), question);
     }
 
     /**
@@ -188,23 +206,36 @@ public class InterviewSession extends AuditableAggregateRoot<InterviewSession> {
 
     /* ---------- helpers ---------- */
 
-    private void ensureFollowUpIsAllowed(Answer followUp, Question question) {
+    /**
+     * The single follow-up rule set, used both to generate a follow-up question and to record the answer to it:
+     * the parent answer is in this session, is a regular answer to {@code questionId}, that question allows
+     * follow-ups and has none yet.
+     *
+     * @param question the question of the parent answer; may be {@code null} only when that answer is not in
+     *                 this session (reported first)
+     * @return the parent (regular) answer
+     */
+    private Answer ensureFollowUpIsAllowed(Long parentAnswerId, Long questionId, Question question) {
+        var parent = answers.stream()
+                .filter(existing -> existing.getId() != null && existing.getId().equals(parentAnswerId))
+                .findFirst()
+                .orElseThrow(() -> new BusinessRuleViolationException(
+                        "The parent answer %s does not exist in this session".formatted(parentAnswerId)));
+        if (question == null) {
+            throw new IllegalArgumentException("The question of the parent answer is required");
+        }
         if (!question.isAllowsFollowUp()) {
             throw new BusinessRuleViolationException("Question %s does not allow follow-up questions".formatted(question.getId()));
         }
-        var parent = answers.stream()
-                .filter(existing -> existing.getId() != null && existing.getId().equals(followUp.getParentAnswerId()))
-                .findFirst()
-                .orElseThrow(() -> new BusinessRuleViolationException(
-                        "The parent answer %s does not exist in this session".formatted(followUp.getParentAnswerId())));
-        if (parent.isFollowUp() || !parent.getQuestionId().equals(followUp.getQuestionId())) {
+        if (parent.isFollowUp() || !parent.getQuestionId().equals(questionId)) {
             throw new BusinessRuleViolationException("A follow-up must reply to the regular answer of the same question");
         }
         var alreadyHasFollowUp = answers.stream()
-                .anyMatch(existing -> existing.isFollowUp() && existing.getQuestionId().equals(followUp.getQuestionId()));
+                .anyMatch(existing -> existing.isFollowUp() && existing.getQuestionId().equals(questionId));
         if (alreadyHasFollowUp) {
-            throw new BusinessRuleViolationException("Question %s already has a follow-up".formatted(followUp.getQuestionId()));
+            throw new BusinessRuleViolationException("Question %s already has a follow-up".formatted(questionId));
         }
+        return parent;
     }
 
     private boolean hasRegularAnswerFor(Long questionId) {

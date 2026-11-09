@@ -70,14 +70,15 @@ public class AssessmentCommandServiceImpl implements AssessmentCommandService {
         var aiSuspicions = new int[]{0};
         var scores = new ArrayList<CriterionScore>();
         var anonymizedExcerpts = new HashMap<Long, String>();
+        var rationales = new HashMap<Long, String>();
         for (var criterion : criteria) {
             scores.add(criterion.isCompetency()
-                    ? scoreCompetency(criterion, answers, candidate, aiSuspicions, anonymizedExcerpts)
+                    ? scoreCompetency(criterion, answers, candidate, aiSuspicions, anonymizedExcerpts, rationales)
                     : scoreCertification(criterion, session.candidateId()));
         }
         var flags = integrityFlags(session, answers.size(), aiSuspicions[0]);
         var assessment = Assessment.calculate(session, scores, flags, answerScoringService.engineVersion(), Instant.now());
-        recordFeedback(assessment, anonymizedExcerpts);
+        recordFeedback(assessment, anonymizedExcerpts, rationales);
         return assessmentRepository.save(assessment);
     }
 
@@ -85,10 +86,11 @@ public class AssessmentCommandServiceImpl implements AssessmentCommandService {
      * Candidate feedback from the scores and the ANONYMIZED excerpts only: the ranking, other candidates and
      * the integrity flags are not even passed to the port.
      */
-    private void recordFeedback(Assessment assessment, Map<Long, String> anonymizedExcerpts) {
+    private void recordFeedback(Assessment assessment, Map<Long, String> anonymizedExcerpts, Map<Long, String> rationales) {
         var inputs = assessment.getCriterionScores().stream()
                 .map(score -> new CriterionFeedback(score.getCriterionName(), score.getCriterionKind(), score.getScore(),
-                        score.getWeightApplied(), anonymizedExcerpts.get(score.getCriterionId())))
+                        score.getWeightApplied(), anonymizedExcerpts.get(score.getCriterionId()),
+                        rationales.get(score.getCriterionId())))
                 .toList();
         var feedback = answerScoringService.summarizeFeedback(assessment.getWeightedScore(), inputs);
         if (feedback != null && !feedback.isBlank()) {
@@ -99,7 +101,7 @@ public class AssessmentCommandServiceImpl implements AssessmentCommandService {
 
     private CriterionScore scoreCompetency(CriterionView criterion, List<InterviewAnswerView> answers,
                                            CandidatePersonalData candidate, int[] aiSuspicions,
-                                           Map<Long, String> anonymizedExcerpts) {
+                                           Map<Long, String> anonymizedExcerpts, Map<Long, String> rationales) {
         var evidences = new ArrayList<Evidence>();
         var scoreSum = BigDecimal.ZERO;
         var confidenceSum = BigDecimal.ZERO;
@@ -116,6 +118,9 @@ public class AssessmentCommandServiceImpl implements AssessmentCommandService {
             }
             evidences.add(new Evidence(answer.answerId(), answer.transcript().substring(start, end), start, end));
             anonymizedExcerpts.putIfAbsent(criterion.criterionId(), result.excerpt());
+            if (result.rationale() != null) {
+                rationales.putIfAbsent(criterion.criterionId(), result.rationale());
+            }
             scoreSum = scoreSum.add(result.score());
             confidenceSum = confidenceSum.add(result.confidence());
             if (result.aiGeneratedSuspicion()) {

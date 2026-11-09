@@ -3,6 +3,8 @@ package pe.upc.simutalk.controllers;
 import pe.upc.simutalk.dtos.AnswerResource;
 import pe.upc.simutalk.dtos.CompleteInterviewSessionCommand;
 import pe.upc.simutalk.dtos.CreateInterviewSessionResource;
+import pe.upc.simutalk.dtos.FollowUpQuestionResource;
+import pe.upc.simutalk.dtos.GenerateFollowUpQuestionCommand;
 import pe.upc.simutalk.dtos.GetAnswersByInterviewSessionIdQuery;
 import pe.upc.simutalk.dtos.GetInterviewSessionByApplicationIdQuery;
 import pe.upc.simutalk.dtos.InterviewSessionResource;
@@ -11,6 +13,7 @@ import pe.upc.simutalk.dtos.StartInterviewSessionCommand;
 import pe.upc.simutalk.exceptions.ResourceNotFoundException;
 import pe.upc.simutalk.mappers.AnswerResourceFromEntityAssembler;
 import pe.upc.simutalk.mappers.CreateInterviewSessionCommandFromResourceAssembler;
+import pe.upc.simutalk.mappers.FollowUpQuestionResourceFromDtoAssembler;
 import pe.upc.simutalk.mappers.InterviewSessionResourceFromEntityAssembler;
 import pe.upc.simutalk.mappers.RecordAnswerCommandFromResourceAssembler;
 import pe.upc.simutalk.services.InterviewSessionCommandService;
@@ -93,6 +96,27 @@ public class InterviewSessionController {
         var answer = interviewSessionCommandService.handle(
                 RecordAnswerCommandFromResourceAssembler.toCommandFromResource(sessionId, resource));
         return ResponseEntity.status(HttpStatus.CREATED).body(AnswerResourceFromEntityAssembler.toResourceFromEntity(answer));
+    }
+
+    @PostMapping("/interview-sessions/{sessionId}/answers/{answerId}/follow-up")
+    @PreAuthorize("hasRole('CANDIDATE') and @interviewsAccess.isSessionCandidate(#sessionId, authentication)")
+    @Operation(summary = "Generar la repregunta de una respuesta (US-09)",
+            description = "Solo el candidato dueño y en IN_PROGRESS. La respuesta no debe ser una repregunta, su pregunta debe "
+                    + "permitir repreguntas y no debe tener ya una repregunta respondida. La IA (o una plantilla en modo mock) "
+                    + "redacta la repregunta en el idioma del header Accept-Language y se guarda en la respuesta: pedirla de "
+                    + "nuevo devuelve la misma. El candidato la responde con POST .../answers, followUp=true y "
+                    + "parentAnswerId = answerId.")
+    @ApiResponses({
+            @ApiResponse(responseCode = "201", description = "Repregunta generada"),
+            @ApiResponse(responseCode = "403", description = "No es el candidato dueño"),
+            @ApiResponse(responseCode = "404", description = "Sesión no encontrada"),
+            @ApiResponse(responseCode = "422", description = "Sesión no IN_PROGRESS o la respuesta no admite repregunta")
+    })
+    public ResponseEntity<FollowUpQuestionResource> generateFollowUpQuestion(@PathVariable Long sessionId,
+                                                                             @PathVariable Long answerId) {
+        var followUpQuestion = interviewSessionCommandService.handle(new GenerateFollowUpQuestionCommand(sessionId, answerId));
+        return ResponseEntity.status(HttpStatus.CREATED)
+                .body(FollowUpQuestionResourceFromDtoAssembler.toResourceFromDto(followUpQuestion));
     }
 
     @PostMapping("/interview-sessions/{sessionId}/completion")

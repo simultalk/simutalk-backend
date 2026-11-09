@@ -4,6 +4,8 @@ import pe.upc.simutalk.dtos.CreateInterviewSessionCommand;
 import pe.upc.simutalk.dtos.CreateInterviewSessionResource;
 import pe.upc.simutalk.dtos.CreateQuestionCommand;
 import pe.upc.simutalk.dtos.CreateQuestionResource;
+import pe.upc.simutalk.dtos.FollowUpQuestion;
+import pe.upc.simutalk.dtos.GenerateFollowUpQuestionCommand;
 import pe.upc.simutalk.dtos.GetAnswersByInterviewSessionIdQuery;
 import pe.upc.simutalk.dtos.GetInterviewSessionByApplicationIdQuery;
 import pe.upc.simutalk.dtos.GetInterviewSessionByIdQuery;
@@ -132,6 +134,8 @@ class InterviewsAuthorizationTest {
         when(sessionCommands.handle(any(CreateInterviewSessionCommand.class))).thenReturn(session);
         when(sessionCommands.handle(any(StartInterviewSessionCommand.class))).thenReturn(session);
         when(sessionCommands.handle(any(RecordAnswerCommand.class))).thenReturn(answer);
+        when(sessionCommands.handle(any(GenerateFollowUpQuestionCommand.class)))
+                .thenReturn(new FollowUpQuestion(300L, 5L, "¿Qué resultado obtuviste?"));
     }
 
     private static CreateQuestionResource questionBody() {
@@ -145,6 +149,7 @@ class InterviewsAuthorizationTest {
     @Test
     @WithMockUser(username = "andina", roles = "RECRUITER")
     void owningRecruiterManagesScriptAndInvites() {
+        assertThatThrownBy(() -> sessions.generateFollowUpQuestion(900L, 300L)).isInstanceOf(AccessDeniedException.class);
         assertThat(questions.createQuestion(10L, questionBody()).getStatusCode()).isEqualTo(HttpStatus.CREATED);
         assertThat(questions.getQuestions(10L).getStatusCode()).isEqualTo(HttpStatus.OK);
         assertThat(sessions.createSession(50L, new CreateInterviewSessionResource(LocalDate.now().plusDays(7)))
@@ -221,6 +226,11 @@ class InterviewsAuthorizationTest {
         assertThat(sessions.startSession(900L).getStatusCode()).isEqualTo(HttpStatus.OK);
         assertThat(sessions.recordAnswer(900L, answerBody()).getStatusCode()).isEqualTo(HttpStatus.CREATED);
         assertThat(sessions.getAnswers(900L).getStatusCode()).isEqualTo(HttpStatus.OK);
+        var followUp = sessions.generateFollowUpQuestion(900L, 300L);
+        assertThat(followUp.getStatusCode()).isEqualTo(HttpStatus.CREATED);
+        assertThat(followUp.getBody().parentAnswerId()).isEqualTo(300L);
+        assertThat(followUp.getBody().questionId()).isEqualTo(5L);
+        assertThat(followUp.getBody().statement()).isEqualTo("¿Qué resultado obtuviste?");
     }
 
     @Test
@@ -231,6 +241,7 @@ class InterviewsAuthorizationTest {
         assertThatThrownBy(() -> sessions.recordAnswer(900L, answerBody())).isInstanceOf(AccessDeniedException.class);
         assertThatThrownBy(() -> sessions.completeSession(900L)).isInstanceOf(AccessDeniedException.class);
         assertThatThrownBy(() -> sessions.getAnswers(900L)).isInstanceOf(AccessDeniedException.class);
+        assertThatThrownBy(() -> sessions.generateFollowUpQuestion(900L, 300L)).isInstanceOf(AccessDeniedException.class);
         verifyNoInteractions(sessionCommands);
     }
 

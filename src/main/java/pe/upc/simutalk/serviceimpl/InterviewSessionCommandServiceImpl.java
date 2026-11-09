@@ -2,6 +2,8 @@ package pe.upc.simutalk.serviceimpl;
 
 import pe.upc.simutalk.dtos.CompleteInterviewSessionCommand;
 import pe.upc.simutalk.dtos.CreateInterviewSessionCommand;
+import pe.upc.simutalk.dtos.FollowUpQuestion;
+import pe.upc.simutalk.dtos.GenerateFollowUpQuestionCommand;
 import pe.upc.simutalk.dtos.InterviewSessionCompletedEvent;
 import pe.upc.simutalk.dtos.RecordAnswerCommand;
 import pe.upc.simutalk.dtos.StartInterviewSessionCommand;
@@ -11,6 +13,7 @@ import pe.upc.simutalk.exceptions.BusinessRuleViolationException;
 import pe.upc.simutalk.exceptions.ResourceNotFoundException;
 import pe.upc.simutalk.repositories.InterviewSessionRepository;
 import pe.upc.simutalk.repositories.QuestionRepository;
+import pe.upc.simutalk.services.FollowUpQuestionService;
 import pe.upc.simutalk.services.InterviewSessionCommandService;
 
 import lombok.RequiredArgsConstructor;
@@ -35,6 +38,9 @@ public class InterviewSessionCommandServiceImpl implements InterviewSessionComma
     private final QuestionRepository questionRepository;
     private final ExternalRecruitmentService externalRecruitmentService;
     private final ApplicationEventPublisher eventPublisher;
+    private final ExternalProfilesService externalProfilesService;
+    private final TranscriptAnonymizer transcriptAnonymizer;
+    private final FollowUpQuestionService followUpQuestionService;
 
     @Override
     public InterviewSession handle(CreateInterviewSessionCommand command) {
@@ -80,6 +86,33 @@ public class InterviewSessionCommandServiceImpl implements InterviewSessionComma
         eventPublisher.publishEvent(new InterviewSessionCompletedEvent(session.getId(), session.getApplicationId(),
                 session.getJobPostingId(), session.getCandidateId(), session.getFinishedAt()));
         return session;
+    }
+
+    /**
+     * US-09. Checks the follow-up rules in the aggregate, anonymizes the answer and asks the AI port for the
+     * follow-up question (the port never fails: it falls back to a template). The question is stored on the
+     * answer, so asking again returns the same question without calling the provider again.
+     */
+    @Override
+    public FollowUpQuestion handle(GenerateFollowUpQuestionCommand command) {
+        var session = loadSession(command.interviewSessionId());
+        var question = session.getAnswers().stream()
+                .filter(existing -> existing.getId() != null && existing.getId().equals(command.answerId()))
+                .findFirst()
+                .map(existing -> questionRepository.findById(existing.getQuestionId())
+                        .orElseThrow(() -> new ResourceNotFoundException("Question", existing.getQuestionId())))
+                .orElse(null);
+        var answer = session.answerForFollowUpQuestion(command.answerId(), question);
+        if (!answer.hasFollowUpQuestion()) {
+            var criterion = externalRecruitmentService.fetchCompetencyCriterionContext(session.getJobPostingId(),
+                    question.getCriterionId());
+            var candidate = externalProfilesService.fetchCandidatePersonalData(session.getCandidateId());
+            var anonymizedAnswer = transcriptAnonymizer.anonymize(answer.getTranscript(), candidate).text();
+            answer.recordFollowUpQuestion(followUpQuestionService.generate(question.getStatement(),
+                    criterion.criterionName(), criterion.criterionDescription(), anonymizedAnswer));
+            interviewSessionRepository.flush();
+        }
+        return new FollowUpQuestion(answer.getId(), answer.getQuestionId(), answer.getFollowUpQuestion());
     }
 
     private InterviewSession loadSession(Long interviewSessionId) {
