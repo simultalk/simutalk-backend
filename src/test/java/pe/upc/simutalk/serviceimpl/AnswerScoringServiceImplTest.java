@@ -164,4 +164,37 @@ class AnswerScoringServiceImplTest {
 
         assertThat(prompt).contains("motivo del puntaje: Respuesta evasiva: no aporta evidencia.", "evasiva");
     }
+
+    /* ---------- feedback without markers, rationale in the requested language ---------- */
+
+    @Test
+    void theFeedbackNeverShowsAnonymizationMarkers() {
+        assertThat(AnswerScoringServiceImpl.withoutMarkers("Estimado/a [NOMBRE], gracias por tu tiempo. Vives en [DIRECCION]."))
+                .isEqualTo("Estimado/a, gracias por tu tiempo. Vives en.");
+        assertThat(AnswerScoringServiceImpl.withoutMarkers("  Gracias por completar la entrevista.  "))
+                .isEqualTo("Gracias por completar la entrevista.");
+    }
+
+    @Test
+    void theFeedbackPromptForbidsGreetingByNameAndFollowsTheLanguage() {
+        var prompt = GeminiRequestFactory.feedbackPrompt("1.0", List.of(new CriterionFeedback(CRITERION,
+                CriterionKind.COMPETENCY, new BigDecimal("1.0"), 100, "No sé", null)));
+
+        assertThat(prompt).contains("No saludes por nombre", "en el idioma").doesNotContain("un texto en español");
+    }
+
+    @Test
+    void mockRationaleFollowsTheRequestLanguage() {
+        var request = new org.springframework.mock.web.MockHttpServletRequest();
+        request.addHeader("Accept-Language", "en-US");
+        org.springframework.web.context.request.RequestContextHolder.setRequestAttributes(
+                new org.springframework.web.context.request.ServletRequestAttributes(request));
+        try {
+            var evasive = MockAnswerScorer.score("No sé, la verdad no sé cómo responder.", CRITERION, CRITERION_DESCRIPTION);
+
+            assertThat(evasive.rationale()).startsWith("Evasive answer");
+        } finally {
+            org.springframework.web.context.request.RequestContextHolder.resetRequestAttributes();
+        }
+    }
 }

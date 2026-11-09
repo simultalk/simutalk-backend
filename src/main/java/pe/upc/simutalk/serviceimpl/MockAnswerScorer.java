@@ -59,8 +59,14 @@ final class MockAnswerScorer {
         var score = evasive ? EVASIVE_SCORE : empty ? EMPTY_SCORE
                 : Math.min(10.0, 4.0 + Math.min(4.0, totalHits * 0.8) + Math.min(2.0, words / 40.0));
         var confidence = evasive || empty ? 0.8 : Math.min(0.95, 0.55 + Math.min(0.4, hits(excerpt, stems) * 0.1));
-        var rationale = evasive ? "Respuesta evasiva: no aporta evidencia sobre el criterio."
-                : empty ? "Respuesta demasiado breve y sin relación con el criterio." : null;
+        var english = AiLanguage.ENGLISH.equals(AiLanguage.current());
+        var rationale = evasive
+                ? (english ? "Evasive answer: it gives no evidence about the criterion."
+                        : "Respuesta evasiva: no aporta evidencia sobre el criterio.")
+                : empty
+                ? (english ? "Answer too short and unrelated to the criterion."
+                        : "Respuesta demasiado breve y sin relación con el criterio.")
+                : null;
         var aiSuspicion = AI_TELLS.stream().anyMatch(transcript.toLowerCase(Locale.ROOT)::contains);
         return new ScoringResult(BigDecimal.valueOf(score).setScale(1, RoundingMode.HALF_UP),
                 BigDecimal.valueOf(confidence).setScale(2, RoundingMode.HALF_UP),

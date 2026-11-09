@@ -1,5 +1,6 @@
 package pe.upc.simutalk.securities;
 
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.web.servlet.FilterRegistrationBean;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -17,6 +18,7 @@ import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 
+import java.util.Arrays;
 import java.util.List;
 
 @Configuration
@@ -38,6 +40,10 @@ public class SecurityConfiguration {
     private final TokenService tokenService;
     private final UnauthorizedRequestHandlerEntryPoint unauthorizedRequestHandler;
     private final ForbiddenRequestHandler forbiddenRequestHandler;
+
+    /** Comma-separated origins allowed by CORS ({@code CORS_ALLOWED_ORIGINS}); {@code *} allows any. */
+    @Value("${cors.allowed-origins:*}")
+    private String allowedOrigins;
 
     public SecurityConfiguration(UserDetailsService userDetailsService, TokenService tokenService,
                                     UnauthorizedRequestHandlerEntryPoint unauthorizedRequestHandler,
@@ -80,15 +86,31 @@ public class SecurityConfiguration {
 
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
-        // TODO: in production restrict allowed origins to the Angular frontend domain.
         var configuration = new CorsConfiguration();
-        configuration.setAllowedOriginPatterns(List.of("*"));
+        configuration.setAllowedOriginPatterns(originPatterns(allowedOrigins));
         configuration.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
         configuration.setAllowedHeaders(List.of("*"));
         configuration.setExposedHeaders(List.of("Location"));
         var source = new UrlBasedCorsConfigurationSource();
         source.registerCorsConfiguration("/**", configuration);
         return source;
+    }
+
+    /**
+     * The origins of {@code CORS_ALLOWED_ORIGINS}, e.g. {@code http://localhost:4200,http://77.112.147.229}.
+     * Blank or containing {@code *} means any origin (the default, so local runs need no setup). Patterns such
+     * as {@code https://*.example.com} are accepted.
+     */
+    static List<String> originPatterns(String value) {
+        if (value == null || value.isBlank()) {
+            return List.of("*");
+        }
+        var origins = Arrays.stream(value.split(","))
+                .map(String::strip)
+                .filter(origin -> !origin.isEmpty())
+                .map(origin -> origin.endsWith("/") ? origin.substring(0, origin.length() - 1) : origin)
+                .toList();
+        return origins.isEmpty() || origins.contains("*") ? List.of("*") : origins;
     }
 
     @Bean

@@ -38,15 +38,32 @@ public final class AiLanguage {
         return first.startsWith("en") ? ENGLISH : SPANISH;
     }
 
-    /** Line appended to a Gemini prompt so the texts come back in the requested language. */
+    /**
+     * Language instruction for a Gemini prompt. The prompts and the inputs are in Spanish, so the English
+     * instruction is written in English and is explicit: a weaker one was ignored by the lite models.
+     * Fragments that must be copied literally from the input are never translated.
+     */
     public static String promptInstruction(String language) {
         return ENGLISH.equals(language)
-                ? "IDIOMA DE RESPUESTA: escribe todos los textos en inglés (en-US). Las claves del JSON no se traducen."
-                : "IDIOMA DE RESPUESTA: escribe todos los textos en español latinoamericano (es-419).";
+                ? "IDIOMA DE RESPUESTA (inglés, en-US) / RESPONSE LANGUAGE: write EVERY text value of the JSON in "
+                        + "English (en-US), even though these instructions and the input are in Spanish. Do not translate "
+                        + "the JSON keys. A fragment that must be copied literally from the input (such as \"excerpt\") "
+                        + "stays exactly as it appears in the input."
+                : "IDIOMA DE RESPUESTA: escribe todos los textos en español latinoamericano (es-419). Los fragmentos que "
+                        + "se copian literalmente de la entrada (como \"excerpt\") se dejan tal como aparecen en ella.";
     }
 
     /** {@link #promptInstruction(String)} for the language of the current request. */
     public static String currentPromptInstruction() {
         return promptInstruction(current());
+    }
+
+    /**
+     * The prompt with the language instruction of the current request before and after it: models follow an
+     * instruction more reliably when it frames the prompt than when it only closes it.
+     */
+    public static String inCurrentLanguage(String prompt) {
+        var instruction = currentPromptInstruction();
+        return instruction + "\n\n" + prompt + "\n" + instruction;
     }
 }

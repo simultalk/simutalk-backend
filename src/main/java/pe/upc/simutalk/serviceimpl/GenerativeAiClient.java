@@ -57,7 +57,7 @@ public class GenerativeAiClient {
     @Autowired
     public GenerativeAiClient(@Value("${external.ai.mode:mock}") String mode,
                               @Value("${external.ai.gemini.base-url:https://generativelanguage.googleapis.com}") String baseUrl,
-                              @Value("${external.ai.gemini.model:gemini-2.5-flash}") String model,
+                              @Value("${external.ai.gemini.model:gemini-3.5-flash-lite}") String model,
                               @Value("${external.ai.gemini.api-key:}") String apiKey,
                               @Value("${external.ai.timeout:20s}") Duration timeout,
                               @Value("${external.ai.max-retries:3}") int maxRetries,

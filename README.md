@@ -45,7 +45,7 @@ entidades, y los módulos funcionales se comunican entre sí mediante fachadas d
 | `CREDENTIALS_MODE` | no | `mock` (`live` llama al emisor; aún sin emisores conectados) |
 | `AI_MODE` | no | `mock` (`live` usa Google Gemini) |
 | `GEMINI_API_KEY` | solo en `live` | — |
-| `GEMINI_MODEL` | no | `gemini-2.5-flash` |
+| `GEMINI_MODEL` | no | `gemini-3.5-flash-lite` (`gemini-2.5-flash` ya no está disponible para claves nuevas) |
 | `MAIL_MODE` | no | `mock` (solo registra en el log; `live` envía con Brevo) |
 | `BREVO_API_KEY` | solo en `live` | — |
 | `MAIL_SENDER_EMAIL` | solo en `live` | remitente verificado en Brevo |
@@ -57,6 +57,7 @@ entidades, y los módulos funcionales se comunican entre sí mediante fachadas d
 | `DB_HOST` | no | `localhost` |
 | `DB_PORT` | no | `5432` |
 | `SERVER_PORT` | no | `8080` |
+| `CORS_ALLOWED_ORIGINS` | no | `*` (orígenes separados por comas, p. ej. `http://localhost:4200,http://77.112.147.229`) |
 
 ## Guía paso a paso en Windows con IntelliJ IDEA
 
@@ -190,6 +191,36 @@ Alternativa que no requiere instalar JDK 21 ni PostgreSQL: solo [Docker Desktop]
 | `Dockerfile` | Build en dos etapas: compila con Maven (JDK 21) y ejecuta solo el `.jar` sobre una imagen JRE 21 |
 | `docker-compose.yml` | Levanta `db` (PostgreSQL 16 con la base `simutalk_db`) y `api`, que espera a que la base esté lista |
 | `.dockerignore` | Evita que `.env`, `target/`, `.idea/` y `.git/` entren a la imagen |
+
+## Despliegue en AWS
+
+El equipo despliega frontend y backend en una instancia EC2 con Docker Compose (`db`, `api` y `web`).
+
+| Qué | URL |
+|---|---|
+| Aplicación (Angular) | http://77.112.147.229 |
+| Swagger UI | http://77.112.147.229:8080/swagger-ui.html |
+| OpenAPI JSON | http://77.112.147.229:8080/v3/api-docs |
+
+Integraciones externas activas en el servidor (los valores secretos viven solo en el `.env` del servidor):
+
+| Variable | Valor | Integración |
+|---|---|---|
+| `AI_MODE` | `live` | Google Gemini (`GEMINI_API_KEY`, `GEMINI_MODEL=gemini-3.5-flash-lite`) |
+| `MAIL_MODE` | `live` | Brevo (`BREVO_API_KEY`, `MAIL_SENDER_EMAIL`) |
+
+Si una integración falla, la API no se cae: la IA usa su modo mock para esa llamada y el correo queda como WARN en el log.
+
+Actualizar el backend en el servidor:
+
+```bash
+cd ~/simutalk-api && git pull && docker compose up -d --build --no-deps api
+docker compose logs --tail=200 api | grep -i "LIVE mode\|Started"
+```
+
+Volver atrás: `git checkout <commit anterior>` y repetir el `docker compose up`. Para apagar una integración sin
+recompilar, poner `AI_MODE=mock` o `MAIL_MODE=mock` en `.env` y ejecutar
+`docker compose up -d --force-recreate --no-deps api`.
 
 ## Autenticación
 
@@ -379,6 +410,18 @@ de que existiera la retroalimentación.
 | POST | `/api/v1/interview-sessions/{sessionId}/answers` | Solo el candidato dueño, en IN_PROGRESS |
 | POST | `/api/v1/interview-sessions/{sessionId}/completion` | Solo el candidato dueño; postulación → ASSESSED |
 | GET | `/api/v1/interview-sessions/{sessionId}/answers` | Candidato dueño, recruiter de la vacante o admin |
+| POST | `/api/v1/interview-sessions/{sessionId}/answers/{answerId}/follow-up` | Solo el candidato dueño, en IN_PROGRESS (US-09) |
+
+**Repregunta (US-09).** `POST .../answers/{answerId}/follow-up` (sin cuerpo) responde `201` con
+`{"parentAnswerId", "questionId", "statement"}`. Solo para una respuesta regular cuya pregunta tenga
+`allowsFollowUp = true` y que aún no tenga repregunta respondida (422 con `Question {id} does not allow follow-up
+questions` o `Question {id} already has a follow-up`). Si se pide de nuevo, devuelve la misma repregunta. Se guarda en
+`followUpQuestion`, que también devuelve `GET .../answers`. El candidato la responde con `POST .../answers`
+(`followUp: true`, `parentAnswerId`, mismo `questionId`) y esa respuesta cuenta en el puntaje del mismo criterio.
+Con `AI_MODE=live` la redacta Gemini a partir de la pregunta, el criterio y la respuesta anonimizada.
+
+**Idioma de la IA.** Los textos que genera Gemini (sugerencias, repregunta, justificación del puntaje y
+retroalimentación) salen en el idioma del header `Accept-Language` (`es-419` o `en-US`; español por defecto).
 
 Una vacante no se puede publicar mientras algún criterio COMPETENCY no tenga preguntas. Con la vacante publicada, el
 guion queda congelado.
