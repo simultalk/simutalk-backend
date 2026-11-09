@@ -116,7 +116,8 @@ public class JobPostingController {
 
     @DeleteMapping("/{jobPostingId}")
     @PreAuthorize("hasRole('ADMIN') or (hasRole('RECRUITER') and @recruitmentAccess.ownsJobPosting(#jobPostingId, authentication))")
-    @Operation(summary = "Eliminar una vacante", description = "Una vacante PUBLISHED debe cerrarse antes de eliminarse.")
+    @Operation(summary = "Eliminar una vacante", description = "Una vacante PUBLISHED debe cerrarse antes de eliminarse. "
+            + "Una vacante con postulaciones no se puede eliminar (422): se cierra.")
     @ApiResponses({
             @ApiResponse(responseCode = "204", description = "Vacante eliminada"),
             @ApiResponse(responseCode = "403", description = "No es el recruiter dueño ni admin"),

@@ -33,7 +33,9 @@ import java.util.List;
  *   <li>Criterion names are unique within a posting (case-insensitive).</li>
  *   <li>A CLOSED posting is read-only; the anonymized screening flag is fixed once
  *       the posting leaves DRAFT.</li>
- *   <li>A PUBLISHED posting cannot be deleted; it has to be closed first.</li>
+ *   <li>A PUBLISHED posting cannot be deleted; it has to be closed first. A posting that already has
+ *       applications cannot be deleted either (its interviews and assessments would lose their criteria):
+ *       it is closed instead.</li>
  *   <li>A DRAFT is only visible to its own company; lists show other companies'
  *       postings only while PUBLISHED.</li>
  * </ul>
@@ -233,9 +235,14 @@ public class JobPosting extends AuditableAggregateRoot<JobPosting> {
         }
     }
 
-    public void ensureCanBeDeleted() {
+    /** @param hasApplications whether any candidate already applied to this posting */
+    public void ensureCanBeDeleted(boolean hasApplications) {
         if (status == JobPostingStatus.PUBLISHED) {
             throw new BusinessRuleViolationException("A published job posting cannot be deleted; close it first");
+        }
+        if (hasApplications) {
+            throw new BusinessRuleViolationException(
+                    "A job posting with applications cannot be deleted; close it instead");
         }
     }
 

@@ -11,6 +11,7 @@ import pe.upc.simutalk.entities.EvaluationCriterion;
 import pe.upc.simutalk.entities.JobPosting;
 import pe.upc.simutalk.entities.Weight;
 import pe.upc.simutalk.exceptions.ResourceNotFoundException;
+import pe.upc.simutalk.repositories.ApplicationRepository;
 import pe.upc.simutalk.repositories.JobPostingRepository;
 import pe.upc.simutalk.services.JobPostingCommandService;
 
@@ -33,6 +34,7 @@ public class JobPostingCommandServiceImpl implements JobPostingCommandService {
 
     private final JobPostingRepository jobPostingRepository;
     private final ExternalInterviewsService externalInterviewsService;
+    private final ApplicationRepository applicationRepository;
 
     @Override
     public JobPosting handle(CreateJobPostingCommand command) {
@@ -51,7 +53,7 @@ public class JobPostingCommandServiceImpl implements JobPostingCommandService {
     @Override
     public void handle(DeleteJobPostingCommand command) {
         var jobPosting = loadJobPosting(command.jobPostingId());
-        jobPosting.ensureCanBeDeleted();
+        jobPosting.ensureCanBeDeleted(applicationRepository.existsByJobPostingId(jobPosting.getId()));
         jobPostingRepository.delete(jobPosting);
     }
 

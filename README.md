@@ -439,7 +439,7 @@ el texto de la vacante, del criterio y del guion (ningún dato de candidatos).
 | GET | `/api/v1/job-postings/{id}` | Obtiene una vacante con sus criterios |
 | GET | `/api/v1/job-postings?companyId=&status=` | Lista vacantes (filtros opcionales) |
 | PUT | `/api/v1/job-postings/{id}` | Actualiza título, descripción, fecha de cierre y anonimización |
-| DELETE | `/api/v1/job-postings/{id}` | Elimina una vacante (no si está PUBLISHED) |
+| DELETE | `/api/v1/job-postings/{id}` | Elimina una vacante (no si está PUBLISHED ni si ya tiene postulaciones: se cierra) |
 | POST | `/api/v1/job-postings/{id}/criteria` | Agrega un criterio (solo en DRAFT) |
 | PUT | `/api/v1/job-postings/{id}/criteria/{criterionId}` | Modifica un criterio (solo en DRAFT) |
 | DELETE | `/api/v1/job-postings/{id}/criteria/{criterionId}` | Elimina un criterio (solo en DRAFT) |
